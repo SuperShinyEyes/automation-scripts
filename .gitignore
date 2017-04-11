@@ -91,4 +91,3 @@ ENV/
 
 # mobileprint
 SECRET.json
-printed/*
