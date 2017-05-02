@@ -62,7 +62,8 @@ class MobilePrint(object):
         print("this_script_name", this_script_name)
         print("__file__", __file__)
         if not basepath:
-            basepath = os.path.dirname(__file__)
+            basepath = os.path.dirname(os.path.abspath(__file__))
+            print("basepath", basepath)
             # basepath = Automator.get_base_path(os.path.abspath(this_script_name))
 
         print("basepath", basepath)
