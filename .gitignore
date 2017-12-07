@@ -92,4 +92,6 @@ ENV/
 # mobileprint
 SECRET.json
 
+# System files
 .DS_Store
+.swp
