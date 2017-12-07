@@ -91,3 +91,5 @@ ENV/
 
 # mobileprint
 SECRET.json
+
+.DS_Store
