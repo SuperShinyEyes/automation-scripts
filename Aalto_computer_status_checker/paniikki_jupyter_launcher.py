@@ -1,7 +1,63 @@
 #/usr/bin/python3
 
+'''
+Date:   2018. Jan. 22nd. Monday
+Author: Seyoung Park
+
+Purpose:
+    1. SSH into Kosh.
+    2. Check uptime of Paniikki machines via 'ssh bit uptime'
+    3. Show bash command to launch a notebook. (No this script doesn't launch the notebook).
+
+ATTENTION:
+    The code works only when you have your RSA Key registered on the remote.
+
+FIXME:
+    Make code so works without RSA Key.
+    Now I couldn't find a way to get stdout. Seems like I have to use a socket.
+    For instance, the following gives some hint how I could use a socket:
+
+"""
+argv = (["ssh", "parks1@kosh.org.aalto.fi", "ssh bit"])
+
+(s1, s2) = socket.socketpair()
+
+def setup():
+    # runs in the child process
+    s2.close()
+s1a, s1b = os.dup(s1.fileno()), os.dup(s1.fileno())
+s1.close()
+p = subprocess.Popen(argv, stdin=s1a, stdout=s1b, preexec_fn=setup,
+                      close_fds=True)#, stderr=stderr)
+# os.close(s1a)
+# os.close(s1b)
+(serverproc, serversock) = (p, s2)
+
+expected = b'SSHUTTLE0001'
+initstring = serversock.recv(len(expected))
+initstring
+"""
+
+    The above won't work if you don't have a public key set up.
+    You get:
+        ssh_askpass: exec(/usr/X11R6/bin/ssh-askpass): No such file or directory
+        Permission denied, please try again.
+
+    Check sshuttle:
+        https://github.com/apenwarr/sshuttle/blob/083293ea0dc2ebc77f282c2803720a2bb5f21a80/sshuttle/ssh.py#L124
+        https://github.com/apenwarr/sshuttle/blob/083293ea0dc2ebc77f282c2803720a2bb5f21a80/sshuttle/client.py#L418
+'''
+
 import subprocess
 
+
+'''
+FIXME
+Find better way to load code to remote. Check sshuttle:
+https://github.com/apenwarr/sshuttle/blob/083293ea0dc2ebc77f282c2803720a2bb5f21a80/sshuttle/ssh.py#L91
+'''
+
+# Following are code to be pushed to remote(kosh)
 CODE_PANIIKKI_UPTIME='''
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
@@ -48,15 +104,13 @@ print(get_available_socket("{user}@{node}.org.aalto.fi"))
 
 class Node:
     '''
-    'befunge:  10:35:49 up 9 days,  8:44,  0 users,  load average: 0.02, 0.01, 0.00'
+    A Paniikki machine
+    Example uptime_output:
+        befunge:  10:35:49 up 9 days,  8:44,  0 users,  load average: 0.02, 0.01, 0.00
     '''
 
     def __init__(self, uptime_output):
         self.init_properties(uptime_output)
-
-    #         self.hostname = hostname
-    #         self.uptime = uptime
-    #         self.num_users = num_users
 
     def init_properties(self, output):
         # print(output)
@@ -73,6 +127,10 @@ class Node:
 
 
 class ComputerLab:
+    '''
+    Paniikki computer lab.
+    Sort the nodes by its number of users and load average.
+    '''
     def __init__(self, uptime_outputs):
         self.nodes = [Node(u) for u in uptime_outputs]
         self.sort()
@@ -111,6 +169,9 @@ class ComputerLab:
 
 
 class ComputerLabRemoteController:
+    '''
+    The brain. Does SSH and remote code loading.
+    '''
     def __init__(self, username):
         self.username = username
         self.uptimes = None
