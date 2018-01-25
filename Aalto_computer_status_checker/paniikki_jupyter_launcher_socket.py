@@ -49,7 +49,9 @@ initstring
 '''
 
 import subprocess
-
+import socket   # For interacting with stdout
+import os    # Fork a process
+import sys
 
 '''
 FIXME
@@ -183,12 +185,34 @@ class ComputerLabRemoteController:
         with open('temp.py', 'w') as f:
             f.write(CODE_PANIIKKI_UPTIME)
 
-        self.uptimes = subprocess.check_output(
-            ["ssh kosh python3 < ./temp.py"],
-            timeout=10,
-            shell=True,  # FIXME: Remove this for security
-            stderr=subprocess.STDOUT
-        ).decode("utf-8").rstrip("\n").split('\n')
+        (s1, s2) = socket.socketpair()
+
+        def setup():
+            s2.close()
+
+        try:
+            argv = ["ssh kosh python3 < ./temp.py"]
+            self.p = subprocess.Popen(argv, stdout=s1, preexec_fn=setup)
+        except OSError as e:
+            print("OSError")
+
+        s1.close()
+
+        if sys.version_info < (3, 0):
+            # python 2.7
+            self.pfile = s2.makefile('wb+')
+        else:
+            # python 3.5
+            self.pfile = s2.makefile('rwb')
+
+        line = self.pfile.readline()
+        self.uptimes = line
+        # self.uptimes = subprocess.check_output(
+        #     ["ssh kosh python3 < ./temp.py"],
+        #     timeout=10,
+        #     shell=True,  # FIXME: Remove this for security
+        #     stderr=subprocess.STDOUT
+        # ).decode("utf-8").rstrip("\n").split('\n')
 
         def contains_bad_output(output):
             bad_ouput_samples = [

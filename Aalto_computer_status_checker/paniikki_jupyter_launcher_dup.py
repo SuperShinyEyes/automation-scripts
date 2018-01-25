@@ -49,7 +49,12 @@ initstring
 '''
 
 import subprocess
-
+import socket   # For interacting with stdout
+import os    # Fork a process
+import sys
+import signal
+import traceback
+import logging
 
 '''
 FIXME
@@ -183,12 +188,42 @@ class ComputerLabRemoteController:
         with open('temp.py', 'w') as f:
             f.write(CODE_PANIIKKI_UPTIME)
 
-        self.uptimes = subprocess.check_output(
-            ["ssh kosh python3 < ./temp.py"],
-            timeout=10,
-            shell=True,  # FIXME: Remove this for security
-            stderr=subprocess.STDOUT
-        ).decode("utf-8").rstrip("\n").split('\n')
+        (s1, s2) = socket.socketpair()
+
+        def setup():
+            s2.close()
+
+        s1a, s1b = os.dup(s1.fileno()), os.dup(s1.fileno())
+        s1.close()
+        print("Popen")
+        try:
+            argv = ["ssh kosh python3 < ./temp.py"]
+            self.p = subprocess.Popen(argv, stdin=s1a, stdout=s1b, preexec_fn=setup, close_fds=True, stderr=_p)
+        except OSError as e:
+            print("OSError")
+        except Exception as e:
+            print(e.__doc__)
+            print(e)
+            logging.error(traceback.format_exc())
+        print("os.close")
+        os.close(s1a)
+        os.close(s1b)
+
+        if sys.version_info < (3, 0):
+            # python 2.7
+            self.pfile = s2.makefile('wb+')
+        else:
+            # python 3.5
+            self.pfile = s2.makefile('rwb')
+
+        line = self.pfile.readline()
+        self.uptimes = line
+        # self.uptimes = subprocess.check_output(
+        #     ["ssh kosh python3 < ./temp.py"],
+        #     timeout=10,
+        #     shell=True,  # FIXME: Remove this for security
+        #     stderr=subprocess.STDOUT
+        # ).decode("utf-8").rstrip("\n").split('\n')
 
         def contains_bad_output(output):
             bad_ouput_samples = [
@@ -250,7 +285,55 @@ class ComputerLabRemoteController:
         self.port = self.get_port()
 
 
+
+
+#################################################################################
+#################################################################################
+#################################################################################
+#################################################################################
+
+
+# Isolate function that needs to be replaced for tests
+def setup_daemon():
+    if os.getuid() != 0:
+        raise Fatal('you must be root (or enable su/sudo) to set the firewall')
+
+    # don't disappear if our controlling terminal or stdout/stderr
+    # disappears; we still have to clean up.
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    # ctrl-c shouldn't be passed along to me.  When the main sshuttle dies,
+    # I'll die automatically.
+    os.setsid()
+
+    # because of limitations of the 'su' command, the *real* stdin/stdout
+    # are both attached to stdout initially.  Clone stdout into stdin so we
+    # can read from it.
+    os.dup2(1, 0)
+
+    return sys.stdin, sys.stdout
+
+_p = None
+
+
+def start_syslog():
+    global _p
+    _p = subprocess.Popen(['logger',
+                            '-p', 'daemon.notice',
+                            '-t', 'paniikki'], stdin=subprocess.PIPE)
+
+
+def stderr_to_syslog():
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os.dup2(_p.stdin.fileno(), 2)
+
+
 def main():
+
     logo = r'''
    _         _ _            ___  __        _____  _____ 
   /_\   __ _| | |_ ___     / __\/ _\       \_   \/__   \
@@ -263,6 +346,8 @@ def main():
     username = input(
         "Hi! Welcome to Aalto CS-IT's Paniikki computer lab Jupyter Notebook controller. Do you want to launch one? Type in your Aalto username :D\n    e.g. tillip1\n>>> ")
     print("Thanks! Hold on a sec. This will take a few secs.")
+    start_syslog()
+    stderr_to_syslog()
     c = ComputerLabRemoteController(username)
     c.run()
 
