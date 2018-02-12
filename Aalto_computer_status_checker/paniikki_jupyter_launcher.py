@@ -59,6 +59,7 @@ https://github.com/apenwarr/sshuttle/blob/083293ea0dc2ebc77f282c2803720a2bb5f21a
 
 # Following are code to be pushed to remote(kosh)
 CODE_PANIIKKI_UPTIME=b'''
+#!/usr/bin/python3
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
 
@@ -82,7 +83,7 @@ for nimi, tulos in executor.map(get_luokka, paniikki):
 
 CODE_GET_PORT = '''
 #!/usr/bin/python3
-
+    
 def is_open(ip,port):
     import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -138,7 +139,12 @@ class ComputerLab:
 
     def sort(self):
         # Sort by number of users
-        self.nodes.sort(key=lambda n: (n.num_users, n.loads.split(',')[0]))
+        self.nodes.sort(key=lambda n: (
+            n.num_users,
+            float(n.loads.split(',')[0]),
+            float(n.loads.split(',')[1]),
+            float(n.loads.split(',')[2])
+        ))
 
     def __print__(self):
         title = "Paniikki Nodes Status"
@@ -243,3 +249,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
