@@ -138,25 +138,7 @@ class ComputerLab:
 
     def sort(self):
         # Sort by number of users
-        self.nodes.sort(key=lambda n: n.num_users)
-        # Now sort by loads
-        nodes_by_num_user_dict = {}
-        for n in self.nodes:
-            nodes_by_num_user_dict.setdefault(n.num_users, [])
-            nodes_by_num_user_dict[n.num_users].append(n)
-        for k, v in nodes_by_num_user_dict.items():
-            v.sort(
-                key=lambda node:
-                float(
-                    node.loads.split(',')[0]
-                )
-            )
-        # Flatten
-        # https://stackoverflow.com/a/952952/3067013
-        self.nodes = [
-            n for nodes in nodes_by_num_user_dict.values()
-            for n in nodes
-        ]
+        self.nodes.sort(key=lambda n: (n.num_users, n.loads.split(',')[0]))
 
     def __print__(self):
         title = "Paniikki Nodes Status"
@@ -188,12 +170,6 @@ class ComputerLabRemoteController:
         grep_stdout = p.communicate(input=CODE_PANIIKKI_UPTIME)[0]
 
         self.uptimes = grep_stdout.decode().rstrip("\n").split('\n')
-        # subprocess.check_output(
-        #     ["ssh kosh python3 < ./temp.py"],
-        #     timeout=10,
-        #     shell=True,  # FIXME: Remove this for security
-        #     stderr=subprocess.STDOUT
-        # ).decode("utf-8").rstrip("\n").split('\n')
 
         def contains_bad_output(output):
             bad_ouput_samples = [
@@ -208,13 +184,6 @@ class ComputerLabRemoteController:
                 return False
 
         self.uptimes = [u for u in self.uptimes if not contains_bad_output(u)]
-
-        # subprocess.check_output(
-        #     ["rm temp.py"],
-        #     timeout=10,
-        #     shell=True,
-        #     stderr=subprocess.STDOUT
-        # ).decode("utf-8").rstrip("\n")
 
         self.lab = ComputerLab(self.uptimes)
         self.lab.__print__()
