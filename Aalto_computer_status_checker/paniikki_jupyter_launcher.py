@@ -18,7 +18,7 @@ FIXME:
     For instance, the following gives some hint how I could use a socket:
 
 """
-argv = (["ssh", "parks1@kosh.org.aalto.fi", "ssh bit"])
+argv = (["ssh", "user@kosh.org.aalto.fi", "ssh bit"])
 
 (s1, s2) = socket.socketpair()
 
@@ -58,7 +58,7 @@ https://github.com/apenwarr/sshuttle/blob/083293ea0dc2ebc77f282c2803720a2bb5f21a
 '''
 
 # Following are code to be pushed to remote(kosh)
-CODE_PANIIKKI_UPTIME=b'''
+CODE_PANIIKKI_UPTIME='''
 #!/usr/bin/python3
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
@@ -67,6 +67,7 @@ import subprocess
 paniikki = [
     "befunge","bit","bogo","brainfuck","deadfish","emo","entropy","false","fractran","fugue","glass","haifu","headache","intercal","malbolge","numberwang","ook","piet","regexpl","remorse","rename","shakespeare","smith","smurf","spaghetti","thue","unlambda","wake","whenever","whitespace","zombie"
 ]
+
 def get_luokka(nimi):
     try:
         return nimi, subprocess.check_output(["ssh", nimi, "uptime"], timeout=1, stderr=subprocess.STDOUT).decode("utf-8").rstrip("\\n")
@@ -77,7 +78,9 @@ def get_luokka(nimi):
 
 executor = ThreadPoolExecutor(max_workers=8)
 
-for nimi, tulos in executor.map(get_luokka, paniikki):
+luokka = paniikki
+
+for nimi, tulos in executor.map(get_luokka, luokka):
     print("%s: %s" % (nimi, tulos))
 '''
 
@@ -167,15 +170,16 @@ class ComputerLabRemoteController:
         self.node = None
         self.port = None
 
-    def check_lab_uptimes(self):
-        # with tempfile.TemporaryDirectory() as temp_file:
-        #     temp_file.write(CODE_PANIIKKI_UPTIME)
-
+    def run_code_on_remote(self, code_as_str, remote="kosh"):
         p = Popen(['ssh', 'kosh', 'python3'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        grep_stdout = p.communicate(input=code_as_str.encode())[0]
+        return grep_stdout.decode().rstrip("\n")
 
-        grep_stdout = p.communicate(input=CODE_PANIIKKI_UPTIME)[0]
+    def check_modules(self):
+        code = ''' '''
 
-        self.uptimes = grep_stdout.decode().rstrip("\n").split('\n')
+    def check_lab_uptimes(self):
+        self.uptimes = self.run_code_on_remote(CODE_PANIIKKI_UPTIME).split('\n')
 
         def contains_bad_output(output):
             bad_ouput_samples = [
@@ -195,31 +199,31 @@ class ComputerLabRemoteController:
         self.lab.__print__()
 
     def print_command(self):
-        command = '''ssh {user}@{node} -t -L {port}:localhost:{port} -o ProxyCommand='ssh {user}@kosh -W %h:%p'  "bash -l -c \'module load courses/CS-E4820 ; jupyter notebook --port={port} --no-browser\'"'''.format(
+        command = '''ssh {user}@{node} -t -L {port}:localhost:{port} -o ProxyCommand='ssh {user}@kosh -W %h:%p'  "bash -l -c \'module load courses/CS-E4820-advanced-probabilistic-methods; jupyter notebook --port={port} --no-browser\'"'''.format(
             user=self.username, node=self.node.hostname, port=self.port)
         print("\n")
         print("Copy/paste this line into your shell in order to start a Jupyter Notebook:\n>>>\n")
         print(command)
         print("\n")
 
+    def check_port_sanity(self, port):
+        assert port.isdigit()
+        assert int(port) > 1024
+        assert int(port) < 64000
+
+        self.port = port
+
     def get_port(self):
         node = self.lab.nodes[0]
-        with open('temp.py', 'w') as f:
-            f.write(CODE_GET_PORT.format(user=self.username, node='bit'))
 
-        self.port = subprocess.check_output(
-            ["ssh kosh python3 < ./temp.py"],
-            timeout=10,
-            shell=True,
-            stderr=subprocess.STDOUT
-        ).decode("utf-8").rstrip("\n")
+        port = self.run_code_on_remote(
+            CODE_GET_PORT.format(
+                user=self.username,
+                node=node
+            )
+        )
 
-        subprocess.check_output(
-            ["rm temp.py"],
-            timeout=10,
-            shell=True,
-            stderr=subprocess.STDOUT
-        ).decode("utf-8").rstrip("\n")
+        self.check_port_sanity(port)
 
         # This is called from this function because of synchronousity
         self.print_command()
@@ -227,7 +231,7 @@ class ComputerLabRemoteController:
     def run(self):
         self.uptimes = self.check_lab_uptimes()
         self.node = self.lab.nodes[0]
-        self.port = self.get_port()
+        self.get_port()
 
 
 def main():
