@@ -48,8 +48,8 @@ initstring
         https://github.com/apenwarr/sshuttle/blob/083293ea0dc2ebc77f282c2803720a2bb5f21a80/sshuttle/client.py#L418
 '''
 
-import subprocess
-
+import subprocess, tempfile
+from subprocess import Popen, PIPE, STDOUT
 
 '''
 FIXME
@@ -58,7 +58,7 @@ https://github.com/apenwarr/sshuttle/blob/083293ea0dc2ebc77f282c2803720a2bb5f21a
 '''
 
 # Following are code to be pushed to remote(kosh)
-CODE_PANIIKKI_UPTIME='''
+CODE_PANIIKKI_UPTIME=b'''
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
 
@@ -180,15 +180,20 @@ class ComputerLabRemoteController:
         self.port = None
 
     def check_lab_uptimes(self):
-        with open('temp.py', 'w') as f:
-            f.write(CODE_PANIIKKI_UPTIME)
+        # with tempfile.TemporaryDirectory() as temp_file:
+        #     temp_file.write(CODE_PANIIKKI_UPTIME)
 
-        self.uptimes = subprocess.check_output(
-            ["ssh kosh python3 < ./temp.py"],
-            timeout=10,
-            shell=True,  # FIXME: Remove this for security
-            stderr=subprocess.STDOUT
-        ).decode("utf-8").rstrip("\n").split('\n')
+        p = Popen(['ssh', 'kosh', 'python3'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+
+        grep_stdout = p.communicate(input=CODE_PANIIKKI_UPTIME)[0]
+
+        self.uptimes = grep_stdout.decode().rstrip("\n").split('\n')
+        # subprocess.check_output(
+        #     ["ssh kosh python3 < ./temp.py"],
+        #     timeout=10,
+        #     shell=True,  # FIXME: Remove this for security
+        #     stderr=subprocess.STDOUT
+        # ).decode("utf-8").rstrip("\n").split('\n')
 
         def contains_bad_output(output):
             bad_ouput_samples = [
@@ -204,12 +209,12 @@ class ComputerLabRemoteController:
 
         self.uptimes = [u for u in self.uptimes if not contains_bad_output(u)]
 
-        subprocess.check_output(
-            ["rm temp.py"],
-            timeout=10,
-            shell=True,
-            stderr=subprocess.STDOUT
-        ).decode("utf-8").rstrip("\n")
+        # subprocess.check_output(
+        #     ["rm temp.py"],
+        #     timeout=10,
+        #     shell=True,
+        #     stderr=subprocess.STDOUT
+        # ).decode("utf-8").rstrip("\n")
 
         self.lab = ComputerLab(self.uptimes)
         self.lab.__print__()
