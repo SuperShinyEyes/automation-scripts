@@ -16,6 +16,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from automator.automator import Automator
 from automator.automator import Constants
 
+from getpass import getpass
+
 
 import smtplib
 from email import encoders
@@ -139,7 +141,7 @@ class MobilePrint(object):
 if __name__ == '__main__':
     automator = Automator(target_file_path=__file__)
     id = automator.secret["id"]
-    pw = automator.secret["pw"]
+    pw = getpass("Password: ")
     recipients = ['mobileprint@aalto.fi']
     ep = EmailProperty(id, pw, recipients)
     mp = MobilePrint(ep)
