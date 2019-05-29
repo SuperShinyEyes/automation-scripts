@@ -6,6 +6,9 @@ Check system load in Paniikki and Maari from Kosh proxy server.
 # On your laptop
 ssh username@kosh.aalto.fi
 
+# Create your Kerberos ticket
+kinit
+
 # Fom Kosh
 python3 check_paniikki_uptime.py
 
